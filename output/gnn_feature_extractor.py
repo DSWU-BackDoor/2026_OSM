@@ -19,6 +19,8 @@ def geo_shift(node_before, node_after):
     return haversine(node_before['lat'], node_before['lon'], node_after['lat'], node_after['lon'])
 
 def centroid(nodes):
+    if not nodes:  
+        return {'lat': 0.0, 'lon': 0.0}  
     lats = [n['lat'] for n in nodes]
     lons = [n['lon'] for n in nodes]
     return {'lat': sum(lats)/len(lats), 'lon': sum(lons)/len(lons)}
