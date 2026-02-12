@@ -143,12 +143,29 @@ def build_edges(objects):
 
 # Label 
 
-def build_labels(objects):
-    import random
+def build_labels(nodes_df):
     labels = []
-    for obj in objects:
-        labels.append({'object_id': obj['obj_id'], 'label': random.choice(['spam','import','tagging_error'])})
+
+    for _, row in nodes_df.iterrows():
+        anomaly = False
+
+        # Rule-based anomaly detection
+        if row["geo_shift_distance"] > 50:   # 50m 이상 이동
+            anomaly = True
+        if row["tag_add_count"] + row["tag_remove_count"] + row["tag_modify_count"] > 5:
+            anomaly = True
+        if row["is_deleted"] == 1:
+            anomaly = True
+        if abs(row["length_change_ratio"]) > 0.5:
+            anomaly = True
+
+        labels.append({
+            "object_id": row["object_id"],
+            "label": int(anomaly)  
+        })
+
     return pd.DataFrame(labels)
+
 
 
 # 메인
@@ -163,7 +180,7 @@ if __name__ == "__main__":
     edges_df = build_edges(objects)
     edges_df.to_csv("edges.csv", index=False)
 
-    labels_df = build_labels(objects)
+    labels_df = build_labels(nodes_df)
     labels_df.to_csv("labels.csv", index=False)
 
     print(" nodes.csv, edges.csv, labels.csv 생성 완료!")
