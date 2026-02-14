@@ -172,7 +172,7 @@ def build_labels(nodes_df):
 
 if __name__ == "__main__":
     objects = load_jsonl("output/objects.jsonl")
-    object_versions = load_jsonl("object_versions.jsonl")
+    object_versions = load_jsonl("output/object_versions.jsonl")
 
     nodes_df = build_node_features(objects, object_versions)
     nodes_df.to_csv("output/nodes.csv", index=False)
