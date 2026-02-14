@@ -55,6 +55,7 @@ def build_node_features(objects, object_versions):
         obj_id = obj['obj_id']
         action = obj['action']
         version = obj['version']
+        changeset_id = obj.get("changeset_id")
         prev_obj = prev_map.get((obj_type, obj_id, version - 1), None)
 
         object_type_id = {"node":0, "way":1, "relation":2}[obj_type]
@@ -92,6 +93,7 @@ def build_node_features(objects, object_versions):
 
         nodes.append({
             "object_id": obj_id,
+            "changeset_id": changeset_id,
             "object_type_id": object_type_id,
             "is_created": is_created,
             "is_deleted": is_deleted,
@@ -110,35 +112,98 @@ def build_node_features(objects, object_versions):
 
 
 # Edge 
+from itertools import combinations
+import pandas as pd
+
+# Edge 
 
 def build_edges(objects):
     edges = []
+    
     node_refs_map = {obj['obj_id']: obj for obj in objects if obj['obj_type']=='node'}
     way_map = {obj['obj_id']: obj for obj in objects if obj['obj_type']=='way'}
     relation_map = {obj['obj_id']: obj for obj in objects if obj['obj_type']=='relation'}
+
+
 
     # contains : way -> node
     for way_id, way in way_map.items():
         for node_ref in way.get('refs', {}).get('node_refs', []):
             if node_ref in node_refs_map:
-                edges.append({'source': way_id, 'target': node_ref, 'edge_type':'contains'})
+                edges.append({
+                    'source': way_id,
+                    'target': node_ref,
+                    'edge_type':'contains'
+                })
 
     # member_of : relation -> member
     for rel_id, rel in relation_map.items():
         for m in rel.get('refs', {}).get('members', []):
-            edges.append({'source': rel_id, 'target': m['ref'], 'edge_type':'member_of'})
+            edges.append({
+                'source': rel_id,
+                'target': m['ref'],
+                'edge_type':'member_of'
+            })
 
     # connected ways : 공유 node
     node_to_ways = {}
     for way_id, way in way_map.items():
         for node_ref in way.get('refs', {}).get('node_refs', []):
             node_to_ways.setdefault(node_ref, []).append(way_id)
+
     for node_ref, ways in node_to_ways.items():
         for w1, w2 in combinations(ways, 2):
             edges.append({'source': w1, 'target': w2, 'edge_type':'connected'})
-            edges.append({'source': w2, 'target': w1, 'edge_type':'connected'})  # 양방향
+            edges.append({'source': w2, 'target': w1, 'edge_type':'connected'})
+
+
+
+
+    changeset_groups = {}
+    for obj in objects:
+        cs = obj.get('changeset')
+        if cs:
+            changeset_groups.setdefault(cs, []).append(obj['obj_id'])
+
+    for cs, obj_ids in changeset_groups.items():
+        for o1, o2 in combinations(obj_ids, 2):
+            edges.append({
+                'source': o1,
+                'target': o2,
+                'edge_type':'same_changeset'
+            })
+            edges.append({
+                'source': o2,
+                'target': o1,
+                'edge_type':'same_changeset'
+            })
+
+
+
+
+    user_groups = {}
+    for obj in objects:
+        user = obj.get('user')
+        if user:
+            user_groups.setdefault(user, []).append(obj['obj_id'])
+
+    for user, obj_ids in user_groups.items():
+        for o1, o2 in combinations(obj_ids, 2):
+            edges.append({
+                'source': o1,
+                'target': o2,
+                'edge_type':'same_user'
+            })
+            edges.append({
+                'source': o2,
+                'target': o1,
+                'edge_type':'same_user'
+            })
+
+
 
     return pd.DataFrame(edges)
+
 
 
 # Label 
